@@ -51,8 +51,9 @@ while True:
     # print(scanner.get_options())
     # print(scanner.get_parameters())
 
+    print("Getting scanner snap")
     snap = scanner.snap()
-
+    print("Saving to buffer")
     imgbytes = io.BytesIO()
     snap.save(imgbytes, format='PNG')
     imgbytes.seek(0)
@@ -73,8 +74,8 @@ while True:
         '+repage',
         outfile
     ]
-
+    print("Sending to IM for trim")
     proc = Popen(command, stdin=PIPE)
     proc.communicate(imgbytes.read())
-
+    print("done")
     time.sleep(5)

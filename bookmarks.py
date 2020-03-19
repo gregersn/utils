@@ -1,9 +1,13 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import json
 from bs4 import BeautifulSoup, element
 import argparse
 from jinja2 import Template
+
+from settings import SETTINGS
 
 bookmark_template = """<!DOCTYPE NETSCAPE-Bookmark-file-1>
 <!-- This is an automatically generated file.
@@ -78,10 +82,16 @@ class Bookmarks(object):
             self.load(filename)
 
     def load(self, filename: str):
+        if '~' in filename:
+            filename = os.path.expanduser(filename)
         with open(filename, 'r') as f:
             self.folders = json.load(f)
 
     def save(self, filename: str = None):
+        if filename is None:
+            filename = self.filename
+        if '~' in filename:
+            filename = os.path.expanduser(filename)
         if filename is None:
             filename = self.filename
 
@@ -161,7 +171,7 @@ def argparser():
 
 
 def add(filename: str):
-    bookmarks = Bookmarks('bookmarks.json')
+    bookmarks = Bookmarks(SETTINGS.get('bookmarks', 'bookmarks.json'))
 
     with open(filename, 'r') as f:
         data = f.read()
@@ -179,7 +189,7 @@ def add(filename: str):
 
 
 def dump(filename: str):
-    bookmarks = Bookmarks('bookmarks.json')
+    bookmarks = Bookmarks(SETTINGS.get('bookmarks', 'bookmarks.json'))
     bookmarks.dump(filename)
 
 

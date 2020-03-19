@@ -9,7 +9,9 @@ import time
 import datetime
 from subprocess import Popen, PIPE
 
-scanner_name = 'dsseries:usb:0x04F9:0x60E0'
+from settings import SETTINGS
+
+scanner_name = SETTINGS.get('scanner', 'dsseries:usb:0x04F9:0x60E0')
 
 print("Sane init")
 sane.init()

@@ -25,7 +25,7 @@ bookmark_template = """<!DOCTYPE NETSCAPE-Bookmark-file-1>
 {{ "    " * loop.depth }}</DL>
     {%- endif %}
     {%- if item.type == 1 %}
-{{ "    " * loop.depth }}<DT><A HREF="{{item.uri}}" ADD_DATE="{{item.date}}"></A>{{item.title}}</DT>
+{{ "    " * loop.depth }}<DT><A HREF="{{item.uri}}" ADD_DATE="{{item.date}}">{{item.title}}</A></DT>
     {%- endif %}
 {%- endfor %}
 </p></DL>
@@ -68,12 +68,16 @@ def linkfolder(link):
 
 class Bookmarks(object):
     def __init__(self, filename: str = None):
+        print("Filename: " + filename)
         self.folders = {
             "title": "bookmarks",
             "dateAdded": 0,
             "lastModified": 0,
             "type": FOLDER,
         }
+
+        if '~' in filename:
+            filename = os.path.expanduser(filename)
 
         if filename is not None:
             self.filename = filename
@@ -82,12 +86,14 @@ class Bookmarks(object):
             self.load(filename)
 
     def load(self, filename: str):
+        print("Loading bookmarks")
         if '~' in filename:
             filename = os.path.expanduser(filename)
         with open(filename, 'r') as f:
             self.folders = json.load(f)
 
     def save(self, filename: str = None):
+        print("Saving bookmarks")
         if filename is None:
             filename = self.filename
         if '~' in filename:

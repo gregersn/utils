@@ -43,13 +43,13 @@ print(scanner.get_options())
 print(scanner.get_parameters())
 """
 
-while True:
+def main():
     try:
         scanner.start()
     except _sane.error as e:
         print("Sleeping while waiting for input")
         time.sleep(5)
-        continue
+        return
     # print(scanner.get_options())
     # print(scanner.get_parameters())
 
@@ -81,3 +81,12 @@ while True:
     proc.communicate(imgbytes.read())
     print("done")
     time.sleep(5)
+
+while True:
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Exiting scanner script")
+        break
+    
+scanner.close()

@@ -23,15 +23,16 @@ def check_repos(folders):
 def check_repo(folder):
     print("Checking repos in {}".format(folder))
     repo = Repo(folder)
-    assert not repo.bare
 
-    config = repo.config_reader()
-
-    heads = repo.heads
     first_commit = None
-    if hasattr(heads, 'master'):
-        for first_commit in repo.iter_commits():
-            pass    
+
+    if not repo.bare:
+        config = repo.config_reader()
+
+        heads = repo.heads
+        if hasattr(heads, 'master'):
+            for first_commit in repo.iter_commits():
+                pass    
 
     return {
         'first_commit': first_commit.hexsha if first_commit is not None else None,

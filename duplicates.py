@@ -3,6 +3,7 @@
 import os
 import hashlib
 import json
+import argparse
 
 
 class Directory(object):
@@ -90,7 +91,6 @@ class Directory(object):
             while v.parent is not None:
                 v = v.parent
                 if v.hash in result:
-                    print("v.hash in result")
                     add = False
             if add:
                 output[key] = value
@@ -109,6 +109,12 @@ class Directory(object):
         return False
 
 
+def argparser():
+    parser = argparse.ArgumentParser(description="Find duplicates in file system")
+    parser.add_argument('--folders', action="store_true")
+    parser.add_argument('--files', action="store_true")
+    parser.add_argument('--dry-run', action="store_true", default=False)
+    return parser
 
 def main():
     folders = {}
@@ -139,12 +145,79 @@ def main():
             print("")
 
 
-def main2():
+def folders():
     directory = Directory(".")
     duplicates = directory.duplicates()
     for d, values in duplicates.items():
         print(d, [v.directory for v in values])
         print(" ")
+
+
+def files(dry_run=False):
+    found_files = {}
+    for root, dirs, files in os.walk('.'):
+        print("Scanning {}".format(root))
+        for file in files:
+            fullpath = os.path.join(root, file)
+            depth = root.count(os.path.sep)
+            stat = os.stat(fullpath)
+            found_files[fullpath] = {
+                'fullpath': fullpath,
+                'depth': depth,
+                'size': stat.st_size
+            }
+    
+    print("Found {} files".format(len(found_files.keys())))
+
+    files_by_size = {}
+    for file, data in found_files.items():
+        if data['size'] not in files_by_size:
+            files_by_size[data['size']] = []
+        
+        files_by_size[data['size']].append(data)
+    
+    files_by_size = {key: value for (key, value) in files_by_size.items() if len(value) > 1}
+    number_of_files = 0
+    for key, value in files_by_size.items():
+        number_of_files += len(value)
+    print("{} files in {} sets".format(number_of_files, len(files_by_size.keys())))
+
+    delete = []
+    for size, files in files_by_size.items():
+        for file in files:
+            with open(file['fullpath'], 'rb') as f:
+                h = hashlib.md5()
+                h.update(f.read(max(1024 * 1024, size)))
+                file['start'] = h.hexdigest()
+
+        file_starts = set([file['start'] for file in files])
+        if len(file_starts) == len(files):
+            delete.append(size)
+    
+    for size in delete:
+        del files_by_size[size]
+
+    number_of_files = 0
+    for key, value in files_by_size.items():
+        number_of_files += len(value)
+    print("{} files in {} sets".format(number_of_files, len(files_by_size.keys())))
+
+    if not dry_run:
+        print("Deleting files")
+        for size, files in files_by_size.items():
+            print("Size: {}".format(size))
+            for file in files:
+                print(file['fullpath'])
+    
+
+def main2():
+    parser = argparser()
+    args = parser.parse_args()
+
+    if args.files:
+        files(args.dry_run)
+    else:
+        folders()
 
 
 if __name__ == "__main__":

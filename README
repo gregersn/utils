@@ -1,0 +1,26 @@
+This is a collection of scripts I write to make stuff easier for myself when doing computer stuff. 
+
+I give no guarantee for the quality of the scripts.
+USE THEM AT YOUR OWN RISK!
+
+bookmarks.py:
+Merge bookmarks.html files.
+
+duplicates.py:
+Some duplicate file and/or directory finding. 
+
+find_repositories.py:
+Tries to locate git repositories in all subdirectories of current folder, and some crude
+checks to see if they are the same. 
+
+missing_files.py:
+Check to see if all files in specified source directory are located somewhere within
+destination directory.
+
+settings.py:
+A helper file for loading some settings from home folder.
+
+scan.py:
+Written for use with a Brother DSMobile 620
+Waits for paper to be inserted, then scans the file, and auto crops it, to the specified directory.
+Used for scanning reciepts.

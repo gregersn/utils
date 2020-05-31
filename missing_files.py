@@ -3,6 +3,9 @@ import os
 import sys
 import hashlib
 
+from common.logger import setup_logger
+logger = setup_logger(__file__)
+
 """
 Checks if all files in directory tree exists in another
 """
@@ -82,7 +85,7 @@ class Directory(object):
             if not self.has_file(other_file):
                 missing_files.append(other_file)
 
-        print("Found {} missing files".format(len(missing_files)))
+        logger.info("Found {} missing files".format(len(missing_files)))
         for f in missing_files:
             print(f.path)
 
@@ -90,14 +93,14 @@ class Directory(object):
 def main():
     source, dest = sys.argv[1:]
 
-    print("Scanning source directory")
+    logger.info("Scanning source directory")
     s = Directory(source)
-    print("..")
 
-    print("Scanning destination directory")
+    logger.info("Scanning destination directory")
     d = Directory(dest)
-    print("..")
+    
 
+    logger.info("Checking files")
     d.has_all(s)
 
 

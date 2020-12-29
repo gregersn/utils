@@ -6,6 +6,8 @@ import json
 import argparse
 
 
+IGNORES = ['.git', '.vscode']
+
 class Directory(object):
     def __init__(self, directory, recurse=True, parent=None):
         print("Opening: {}".format(directory))
@@ -21,6 +23,8 @@ class Directory(object):
     def scan(self):
         self.depth = 0
         for entry in self.content:
+            if entry in IGNORES:
+                continue
             fullpath = os.path.join(self.directory, entry)
             if os.path.isdir(fullpath):
                 subdir = Directory(fullpath,  parent=self)
@@ -147,15 +151,20 @@ def main():
 
 def folders():
     directory = Directory(".")
+    print(" ")
     duplicates = directory.duplicates()
     for d, values in duplicates.items():
-        print(d, [v.directory for v in values])
+        print(d), 
+        for v in values:
+            print(f"* {v.directory}")
         print(" ")
 
 
 def files(dry_run=False):
     found_files = {}
-    for root, dirs, files in os.walk('.'):
+    for root, dirs, files in os.walk('.', topdown=True):
+        dirs[:] = [d for d in dirs if d not in IGNORES]
+
         print("Scanning {}".format(root))
         for file in files:
             fullpath = os.path.join(root, file)

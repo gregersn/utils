@@ -167,12 +167,42 @@ class Bookmarks(object):
         b = Template(bookmark_template)
         with open(outfile, 'w') as f:
             f.write(b.render(self.folders))
+    
+    def get(self, folder=None):
+        if folder is None:
+            folder = self.folders
+
+        for bm in folder['children']:
+            if bm['type'] == BOOKMARK:
+                yield bm
+            
+            if bm['type'] == FOLDER:
+                for b in self.get(bm):
+                    yield b
+    
+    def clean(self):
+        before_clean = 0
+        after_clean = 0
+
+        uris = {}
+
+        for bookmark in self.get():
+            before_clean += 1
+            if bookmark['uri'] not in uris:
+                uris[bookmark['uri']] = bookmark
+                after_clean += 1
+      
+        print(before_clean)
+        print(after_clean)
+        
 
 
 def argparser():
     parser = argparse.ArgumentParser("Handle bookmarks")
     parser.add_argument('--add', type=str, nargs=1)
     parser.add_argument('--dump', type=str, nargs=1)
+    parser.add_argument('--list', action="store_true")
+    parser.add_argument('--clean', action="store_true")
     return parser
 
 
@@ -201,11 +231,22 @@ def dump(filename: str):
 
 def main():
     args = argparser().parse_args()
+
+    bookmarks = Bookmarks(SETTINGS.get('bookmarks', 'bookmarks.json'))
+
     if args.add:
         add(args.add[0])
 
     if args.dump:
         dump(args.dump[0])
+    
+    if args.list:
+        for bm in bookmarks.get():
+            print(bm)
+    
+    if args.clean:
+        bookmarks.clean()
+        bookmarks.save("cleaned.json")
 
 
 if __name__ == "__main__":

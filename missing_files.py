@@ -12,7 +12,9 @@ Checks if all files in directory tree exists in another
 
 class File(object):
     def __init__(self, path):
-        assert os.path.isfile(path)
+        # assert os.path.isfile(path), path
+        if not os.path.isfile(path):
+            return None
         self.path = path
         stat = os.stat(path)
         self.size = stat.st_size
@@ -63,6 +65,8 @@ class Directory(object):
 
         for root, folders, files in os.walk(path):
             for filename in files:
+                if not os.path.isfile(os.path.join(root, filename)):
+                    continue
                 fo = File(os.path.join(root, filename))
                 self.content.append(fo)
                 if fo.size not in self.files_by_size:
@@ -92,6 +96,12 @@ class Directory(object):
 
 def main():
     source, dest = sys.argv[1:]
+
+    if '~' in source:
+        source = os.path.expanduser(source)
+    
+    if '~' in dest:
+        dest = os.path.expanduser(dest)
 
     logger.info("Scanning source directory")
     s = Directory(source)

@@ -5,12 +5,17 @@ import hashlib
 import json
 import argparse
 
+from typing import Dict, TypedDict, List
+
+from common.logger import setup_logger
+logger = setup_logger(__file__)
+
 
 IGNORES = ['.git', '.vscode']
 
 class Directory(object):
     def __init__(self, directory, recurse=True, parent=None):
-        print("Opening: {}".format(directory))
+        logger.info("Opening: {}".format(directory))
         self.directory = os.path.abspath(directory)
         self.subdirectories = {}
         self.content = sorted(os.listdir(directory))
@@ -124,24 +129,24 @@ def main():
     folders = {}
 
     for root, dirs, files in os.walk('.'):
-        print("Checking folder: {}".format(root))
+        logger.info("Checking folder: {}".format(root))
         if root not in folders:
             folders[root] = {
                 'files': files,
                 'dirs': dirs
             }
-    print("...done checking folders\n")
+    logger.info("...done checking folders\n")
 
     folders_by_content = {}
 
-    print("Sorting by content")
+    logger.info("Sorting by content")
     for folder, items in folders.items():
         items_json = json.dumps(items)
         if items_json not in folders_by_content:
             folders_by_content[items_json] = []
         
         folders_by_content[items_json].append(folder)
-    print("...done\n")
+    logger.info("...done\n")
     for content, folders in folders_by_content.items():
         if len(folders) > 1:
             print("Folders that might be equal:")
@@ -151,21 +156,29 @@ def main():
 
 def folders():
     directory = Directory(".")
-    print(" ")
+    logger.info(" ")
     duplicates = directory.duplicates()
     for d, values in duplicates.items():
-        print(d), 
+        logger.info(d), 
         for v in values:
-            print(f"* {v.directory}")
-        print(" ")
+            logger.info(f"* {v.directory}")
+        logger.info(" ")
 
+
+class FileInfo(TypedDict):
+    fullpath: str
+    depth: int
+    size: int
+    start: str
 
 def files(dry_run=False):
-    found_files = {}
+    found_files: Dict[str, FileInfo] = {}
+
+    # Find all the files in the directory
     for root, dirs, files in os.walk('.', topdown=True):
         dirs[:] = [d for d in dirs if d not in IGNORES]
 
-        print("Scanning {}".format(root))
+        logger.info("Scanning {}".format(root))
         for file in files:
             fullpath = os.path.join(root, file)
             depth = root.count(os.path.sep)
@@ -173,12 +186,13 @@ def files(dry_run=False):
             found_files[fullpath] = {
                 'fullpath': fullpath,
                 'depth': depth,
-                'size': stat.st_size
+                'size': stat.st_size,
+                'start': ''
             }
     
     print("Found {} files".format(len(found_files.keys())))
 
-    files_by_size = {}
+    files_by_size: Dict[int, List[FileInfo]] = {}
     for file, data in found_files.items():
         if data['size'] not in files_by_size:
             files_by_size[data['size']] = []
@@ -211,12 +225,29 @@ def files(dry_run=False):
         number_of_files += len(value)
     print("{} files in {} sets".format(number_of_files, len(files_by_size.keys())))
 
+    files_by_size_and_hash: Dict[int, Dict[str, List[FileInfo]]] = {}
+    for size, data in files_by_size.items():
+        if size not in files_by_size_and_hash:
+            files_by_size_and_hash[size] = {}
+        
+        t = files_by_size_and_hash[size]
+        for f in data:
+            h = f['start']
+            if h not in t:
+                t[h] = []
+            t[f['start']].append(f)
+  
     if not dry_run:
         print("Deleting files")
-        for size, files in files_by_size.items():
+        for size, hashes in files_by_size_and_hash.items():
             print("Size: {}".format(size))
-            for file in files:
-                print(file['fullpath'])
+            for h, files in hashes.items():
+                if len(files) < 2:
+                    continue
+                print(f"Hash: {h}")
+                for f in files:
+                    print(f['fullpath'])
+                print("")
     
 
 def main2():

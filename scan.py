@@ -71,7 +71,7 @@ def main():
         'convert',
         '-',
         '-fuzz',
-        '1%',
+        '2%',
         '-trim',
         '+repage',
         outfile

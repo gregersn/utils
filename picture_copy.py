@@ -9,6 +9,7 @@ import pyexiv2
 
 EXTENSIONS = ('nef', 'mov')
 
+
 def find_files(folder: str):
     print(folder)
     found_files = []
@@ -16,21 +17,24 @@ def find_files(folder: str):
         for file in files:
             file_info = pathlib.Path(os.path.join(root, file))
             stat = file_info.stat()
-            file_modification_time = datetime.datetime.fromtimestamp(stat.st_mtime)
+            file_modification_time = datetime.datetime.fromtimestamp(
+                stat.st_mtime)
             found_files.append({
                 'folder': root,
                 'filename': file,
                 'timestamp': file_modification_time
             })
-    
+
     return found_files
+
 
 def prune_files(files, dest_folder):
     for file in files:
         file['copy'] = True
 
         ts = file['timestamp']
-        picture_dest_folder = os.path.join(dest_folder, str(ts.year), str(ts.month).zfill(2))
+        picture_dest_folder = os.path.join(
+            dest_folder, str(ts.year), str(ts.month).zfill(2))
         file['dest_folder'] = picture_dest_folder
 
         extension = file['filename'].split('.')[-1].lower()
@@ -43,7 +47,8 @@ def prune_files(files, dest_folder):
 
     return files
 
-def copy_files(files):
+
+def copy_files(files, dry_run=True):
     for file in files:
         if file['copy']:
             print(f"Copying {file['filename']}")
@@ -54,14 +59,18 @@ def copy_files(files):
                     raise IOError
             else:
                 print("Destination folder does not exist")
-                os.makedirs(file['dest_folder'])
-    
-            shutil.copy2(os.path.join(file['folder'], file['filename']), file['dest_folder'])         
+                if not dry_run:
+                    os.makedirs(file['dest_folder'])
+
+            if not dry_run:
+                shutil.copy2(os.path.join(
+                    file['folder'], file['filename']), file['dest_folder'])
 
         else:
             print(f"Not copying {file['filename']}")
 
-def main():  
+
+def main():
     source = sys.argv[1]
     dest = "."
 
@@ -70,15 +79,14 @@ def main():
 
     if '~' in source:
         source = os.path.expanduser(source)
-    
+
     if '~' in dest:
         dest = os.path.expanduser(dest)
-
 
     source_files = find_files(source)
     files_to_copy = prune_files(source_files, dest)
 
-    copy_files(files_to_copy)
+    copy_files(files_to_copy, dry_run=False)
 
 
 if __name__ == "__main__":

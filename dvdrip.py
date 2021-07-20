@@ -120,15 +120,34 @@ class DVD:
 
 
 @click.command()
-@click.option('--name', help="Name/title of DVD", required=True)
 @click.option('--source', help="Source", required=True)
+@click.option('--name', help="Name/title of DVD", required=False)
 @click.option('--output', help="Output folder", required=False)
-def main(name, source, output=None):
+def main(source, name=None, output=None):
     source = Path(source)
     assert source.exists()
-    dvd = DVD(str(source),
-              name=name)
-    dvd.to_mkv(output or ".")
+
+    if source.is_dir():
+        discs = []
+        files = source.glob('*')
+        for file in files:
+            if file.suffix in ['.iso', '.ISO']:
+                discs.append(file)
+        print([file for file in discs])
+        name = source.parts[-1]
+
+        if len(discs) > 1:
+            print("More than one disc currently not supported")
+            return
+
+        dvd = DVD(str(discs[0]),
+                  name=name)
+        dvd.to_mkv(output or ".")
+
+    else:
+        dvd = DVD(str(source),
+                  name=name)
+        dvd.to_mkv(output or ".")
 
 
 if __name__ == '__main__':

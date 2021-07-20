@@ -6,6 +6,10 @@ import time
 from pathlib import Path
 from makemkv import MakeMKV
 
+import logging
+
+logging.getLogger("makemkv").setLevel(logging.ERROR)
+
 
 class DVDTitle:
     duration: float
@@ -28,20 +32,24 @@ class DVDTitle:
 
 
 class MKVProgress:
-    current_task: str
+    current_task: Union[str, None]
     state: int
     max: int
 
     def __init__(self):
-        self.current_task = "Unknown"
+        self.current_task = None
+
+    def reset(self):
+        self.current_task = None
 
     def progress(self, task_description: str, progress: int, _max: int):
-        if task_description != self.current_task:
-            print("")
+        if self.current_task is not None and task_description != self.current_task:
+            print(f"\r*** {self.current_task}: {int((1.0) * 100)}%")
 
-            self.current_task = task_description
+        self.current_task = task_description
 
-        print(f"\r{self.current_task}: {progress} / {_max}", end="")
+        print(
+            f"\r*** {self.current_task}: {int((progress / _max) * 100)}%", end="")
 
 
 class DVD:
@@ -102,12 +110,14 @@ class DVD:
             self.source, progress_handler=progressor.progress)
 
         for title in self.titles:
+            progressor.reset()
             outfile = output_folder / f"title_{title.index}-other.mkv"
             if title == self.main_title:
-                print("Ripping main title")
+                print("\n** Ripping main title")
                 outfile = output_folder / (self.name + '.mkv')
             else:
-                print(f"Ripping title {title.index}")
+                print(
+                    f"\n** Ripping title {title.index + 1} / {len(self.titles)}")
 
             makemkv.mkv(title.index, output_folder)
 
@@ -116,7 +126,7 @@ class DVD:
             print("")
 
     def __repr__(self):
-        return f"{self.name}, {self.information}, {len(self.titles)} titles"
+        return f"* {self.name}, {self.information}, {len(self.titles)} title(s)."
 
 
 @click.command()
@@ -133,7 +143,7 @@ def main(source, name=None, output=None):
         for file in files:
             if file.suffix in ['.iso', '.ISO']:
                 discs.append(file)
-        print([file for file in discs])
+        # print([file for file in discs])
         name = source.parts[-1]
 
         if len(discs) > 1:

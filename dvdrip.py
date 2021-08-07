@@ -57,10 +57,10 @@ class DVD:
     information: str
     titles: List[DVDTitle]
     main_title: Union[DVDTitle, None]
-    source: Path
+    sources: List[Path]
 
-    def __init__(self, filename: str, name: str = None):
-        self.source = Path(filename)
+    def __init__(self, filename: List[str], name: str = None):
+        self.sources = [Path(f) for f in filename]
         self.titles = []
         self.__dirty = True
         self.main_title = None
@@ -84,17 +84,13 @@ class DVD:
                 if t.duration > self.main_title.duration:
                     self.main_title = t
 
-    def open(self):
-        self.__makemkv = MakeMKV(self.source, minlength=1)
+    def open(self, source: Path):
+        self.__makemkv = MakeMKV(source, minlength=1)
         discinfo = self.__makemkv.info()
         self.convert_info(discinfo)
         self.__dirty = False
 
     def to_mkv(self, output):
-        if self.__dirty:
-            self.open()
-        print(self)
-
         output_folder = Path(output).absolute()
 
         if self.name is not None:
@@ -106,24 +102,27 @@ class DVD:
 
         progressor = MKVProgress()
 
-        makemkv = MakeMKV(
-            self.source, progress_handler=progressor.progress)
+        for i, source in enumerate(self.sources):
+            self.open(source)
+            makemkv = MakeMKV(
+                source, progress_handler=progressor.progress)
 
-        for title in self.titles:
-            progressor.reset()
-            outfile = output_folder / f"title_{title.index}-other.mkv"
-            if title == self.main_title:
-                print("\n** Ripping main title")
-                outfile = output_folder / (self.name + '.mkv')
-            else:
-                print(
-                    f"\n** Ripping title {title.index + 1} / {len(self.titles)}")
+            for title in self.titles:
+                progressor.reset()
+                outfile = output_folder / \
+                    f"title_{i + 1}_{title.index}-other.mkv"
+                if title == self.main_title and i == 0:
+                    print("\n** Ripping main title")
+                    outfile = output_folder / (self.name + '.mkv')
+                else:
+                    print(
+                        f"\n** Ripping title {title.index + 1} / {len(self.titles)}")
 
-            makemkv.mkv(title.index, output_folder)
+                makemkv.mkv(title.index, output_folder)
 
-            infile = output_folder / title.file_output
-            infile.rename(outfile)
-            print("")
+                infile = output_folder / title.file_output
+                infile.rename(outfile)
+                print("")
 
     def __repr__(self):
         return f"* {self.name}, {self.information}, {len(self.titles)} title(s)."
@@ -146,11 +145,7 @@ def main(source, name=None, output=None):
         # print([file for file in discs])
         name = source.parts[-1]
 
-        if len(discs) > 1:
-            print("More than one disc currently not supported")
-            return
-
-        dvd = DVD(str(discs[0]),
+        dvd = DVD(discs,
                   name=name)
         dvd.to_mkv(output or ".")
 

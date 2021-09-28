@@ -1,26 +1,46 @@
 #!/usr/bin/env python3
 
 import os
-import sys
+from typing import List, Optional, TypedDict
+import click
 import shutil
 import datetime
-import pathlib
+from pathlib import Path
 import pyexiv2
+
+from logging import getLogger, basicConfig
+
+basicConfig()
+logger = getLogger("picture_copy")
+logger.setLevel(os.environ.get('LOGLEVEL', 'WARNING'))
 
 EXTENSIONS = ('nef', 'mov')
 
 
-def find_files(folder: str):
-    print(folder)
-    found_files = []
-    for root, folders, files in os.walk(folder):
+class PictureFile(TypedDict):
+    folder: Path
+    filename: str
+    timestamp: datetime.datetime
+
+
+class FileToCopy(TypedDict):
+    file: PictureFile
+    copy: bool
+    dest_folder: Optional[Path]
+
+
+def find_files(folder: Path):
+    logger.info(f"Finding files in {folder}")
+    found_files: List[PictureFile] = []
+    for root, _, files in os.walk(folder):
+        logger.info(f"Going into {root}")
         for file in files:
-            file_info = pathlib.Path(os.path.join(root, file))
+            file_info = Path(root) / file
             stat = file_info.stat()
             file_modification_time = datetime.datetime.fromtimestamp(
                 stat.st_mtime)
             found_files.append({
-                'folder': root,
+                'folder': Path(root),
                 'filename': file,
                 'timestamp': file_modification_time
             })
@@ -28,65 +48,76 @@ def find_files(folder: str):
     return found_files
 
 
-def prune_files(files, dest_folder):
+def prune_files(files: List[PictureFile], dest_folder: Path):
+    outfiles: List[FileToCopy] = []
     for file in files:
-        file['copy'] = True
+        outfile: FileToCopy = {
+            'file': file,
+            'copy': True,
+            'dest_folder': None
+        }
 
         ts = file['timestamp']
-        picture_dest_folder = os.path.join(
-            dest_folder, str(ts.year), str(ts.month).zfill(2))
-        file['dest_folder'] = picture_dest_folder
+        picture_dest_folder = (dest_folder /
+                               str(ts.year) / str(ts.month).zfill(2))
+        outfile['dest_folder'] = picture_dest_folder
 
         extension = file['filename'].split('.')[-1].lower()
 
         if extension not in EXTENSIONS:
-            file['copy'] = False
+            outfile['copy'] = False
 
-        if os.path.exists(os.path.join(picture_dest_folder, file['filename'])):
-            file['copy'] = False
+        if (picture_dest_folder / file['filename']).exists():
+            outfile['copy'] = False
 
-    return files
+        outfiles.append(outfile)
+
+    return outfiles
 
 
-def copy_files(files, dry_run=True):
-    for file in files:
-        if file['copy']:
-            print(f"Copying {file['filename']}")
-            if os.path.exists(file['dest_folder']):
-                print("Destination folder exists")
-                if not os.path.isdir(file['dest_folder']):
-                    print("... but is not a folder")
+def copy_files(files: List[FileToCopy], dry_run: bool = True):
+    for copyfile in files:
+        source = copyfile['file']
+        if copyfile['copy']:
+            print(f"Copying {source['filename']}")
+            if copyfile['dest_folder'] and copyfile['dest_folder'].exists():
+                logger.warning("Destination folder exists")
+                if not copyfile['dest_folder'].is_dir():
+                    logger.error("... but is not a folder")
                     raise IOError
             else:
-                print("Destination folder does not exist")
-                if not dry_run:
-                    os.makedirs(file['dest_folder'])
+                logger.info("Destination folder does not exist")
+                if not dry_run and copyfile['dest_folder']:
+                    logger.debug(f"Creating folder {copyfile['dest_folder']}")
+                    copyfile['dest_folder'].mkdir(parents=True)
 
-            if not dry_run:
-                shutil.copy2(os.path.join(
-                    file['folder'], file['filename']), file['dest_folder'])
+            if not dry_run and copyfile['dest_folder']:
+                shutil.copy2((source['folder'] /
+                             source['filename']), copyfile['dest_folder'])
 
         else:
-            print(f"Not copying {file['filename']}")
+            logger.debug(f"Skipping {source['filename']}, destination exists.")
 
 
-def main():
-    source = sys.argv[1]
-    dest = "."
+@click.command()
+@click.argument("src", type=click.Path(exists=True, path_type=Path))
+@click.argument("dst", type=click.Path(exists=True, path_type=Path))
+@click.option('--dry-run/--no-dry-run', default=False)
+def main(src: Path, dst: Path, dry_run: bool = False):
+    """
+    Picture Copy
 
-    if len(sys.argv) > 2:
-        dest = sys.argv[2]
+    SRC Folder to find pictures in
 
-    if '~' in source:
-        source = os.path.expanduser(source)
-
-    if '~' in dest:
-        dest = os.path.expanduser(dest)
+    DST Folder to copy pictures into
+    """
+    source = src.expanduser()
+    dest = dst.expanduser()
 
     source_files = find_files(source)
     files_to_copy = prune_files(source_files, dest)
 
-    copy_files(files_to_copy, dry_run=False)
+    copy_files(files_to_copy, dry_run=dry_run)
 
 
 if __name__ == "__main__":

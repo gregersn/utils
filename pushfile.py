@@ -54,7 +54,8 @@ def main(source: Path, paths: Any):
     scp = SCPClient(ssh.get_transport(), progress=progress)
     for source_file in source_files:
         try:
-            scp.put(source_file, remote_path=f"{filedir}/{dest_folder}")
+            scp.put(
+                source_file, remote_path=f"{filedir}/{dest_folder}", recursive=source_file.is_dir())
             url = f"{base_url}/{source_file.name}"
             print(f"Uploaded file to: {url}")
         except SCPException as e:

@@ -121,7 +121,7 @@ class FileIndex:
         print(Path.cwd())
 
     def add_file(self, file_object: File):
-        print("ADding file", file_object)
+        print("Adding", file_object)
         self._index[str(file_object.path)] = file_object
 
     def save(self):
@@ -170,6 +170,7 @@ class FileIndex:
             found = False
             if not my_file.size in other_sizes:
                 missing.append(my_file)
+                print("Missing file: ", my_file)
                 continue
 
             same_size = other_sizes[my_file.size]
@@ -182,6 +183,7 @@ class FileIndex:
                     break
 
             if not found:
+                print("Missing file: ", my_file)
                 missing.append(my_file)
 
         return missing
@@ -242,7 +244,8 @@ def compare(destination: Path, source: Path, min_size: int = 1):
 
     missing = source_index.missing_from(destination_index)
 
-    print(missing)
+    for f in missing:
+        print(f)
 
 
 if __name__ == "__main__":

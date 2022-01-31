@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import os
+import re
 import sys
+import shutil
 from pathlib import Path
 import hashlib
 from typing import Dict, Any, List, Optional, TypedDict, Union, Tuple
@@ -160,12 +162,15 @@ class FileIndex:
         return by_hash
 
     def missing_from(self, other: 'FileIndex') -> List[File]:
+        print("Loading destination index")
         self.load()
+        print("Loading source index")
         other.load()
         other_sizes = other.by_size()
 
         missing: List[File] = []
-
+    
+        print("Comparing files")
         for _, my_file in self.index.items():
             found = False
             if not my_file.size in other_sizes:
@@ -246,6 +251,51 @@ def compare(destination: Path, source: Path, min_size: int = 1):
 
     for f in missing:
         print(f)
+
+@cli.command()
+@click.argument("folder", type=click.Path(path_type=Path, file_okay=False, exists=True))
+@click.argument("missing_files", type=click.Path(path_type=Path, dir_okay=False, exists=True))
+@click.option("--delete", is_flag=True, help="Really delete files.")
+def delete(folder: Path, missing_files: Path, delete: bool = False):
+    """Delete all the files that are not missing when compared to some other folder."""
+
+    if delete:
+        print("THIS IS NOT A DRILL, FILES WILL BE DELETED!")
+
+    print("Loading data from previous run")
+    missing_files_path: List[str] = []
+
+    filename_re = re.compile('<File (.*)>')
+
+    with open(missing_files) as f:
+        while line := f.readline():
+            file_path = filename_re.match(line)
+            if file_path:
+                missing_files_path.append(file_path.group(1))
+
+    print("Loading fileindex")
+    folder_index = FileIndex(folder)
+    print("Reading file info")
+    folder_index.load()
+    
+    print("Running through files.")
+    for path, file_info in folder_index.index.items():
+        if not str(file_info.path) in missing_files_path:
+            if delete:
+                print(f"Will delete: {path}")
+                # Path(path).unlink()
+                destination = Path(f"u/deleted/{path}").parent
+                os.makedirs(destination, exist_ok=True)
+                try:
+                    shutil.move(file_info.path, f"u/deleted/{path}")
+                except FileNotFoundError:
+                    print("Skipping file not found.")
+            else:
+                print(f"File to delete: {path}")
+        else:
+            print(f"File missing from destination: {path}")
+    
+
 
 
 if __name__ == "__main__":

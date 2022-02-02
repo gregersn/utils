@@ -17,6 +17,7 @@ INDEX_FILE_NAME = ".GSN_file_index.json"
 class FileInfo(TypedDict):
     path: str
     size: int
+    quickhash: str
     hash: str
 
 
@@ -31,11 +32,12 @@ class File:
     path: Path
     size: int
     _quickhash: Any
+    _hash: Any
 
-    def __init__(self, path: Path, size: Optional[int] = None, quickhash: Optional[str] = None):
+    def __init__(self, path: Path, size: Optional[int] = None, quickhash: Optional[str] = None, checksum: Optional[str] = None):
         self.path = path
         self.size = size or path.stat().st_size
-        self._hash = None
+        self._hash = checksum
         self._quickhash = quickhash
         self.hash_depth = 0
 
@@ -43,10 +45,10 @@ class File:
 
     @classmethod
     def from_dict(cls, data: FileInfo, parent: Path):
-        return cls(parent / Path(data['path']), data['size'], data['hash'])
+        return cls(parent / Path(data['path']), data['size'], data['quickhash'], data['hash'])
 
     def to_dict(self):
-        return {'path': str(self.path), 'size': self.size, 'hash': self.quickhash}
+        return {'path': str(self.path), 'size': self.size, 'quickhash': self.quickhash, 'hash': self.hash if self._hash is not None else None}
 
     @property
     def quickhash(self) -> str:
@@ -70,6 +72,8 @@ class File:
                     self._hash.update(fb)
                     fb = f.read(block_size)
 
+        if isinstance(self._hash, str):
+            return self._hash
         return self._hash.hexdigest()
 
     def __repr__(self):
@@ -110,6 +114,7 @@ class FileIndex:
         cwd = Path.cwd()
         os.chdir(self.path)
         for root, _, files in os.walk('.'):
+            print(f"Checking {len(files)} file(s) in folder: {root}")
             r = Path(root)
             for filename in files:
                 path = r / filename
@@ -123,8 +128,13 @@ class FileIndex:
         print(Path.cwd())
 
     def add_file(self, file_object: File):
-        print("Adding", file_object)
+        # print(f"Adding: {file_object.path}")
         self._index[str(file_object.path)] = file_object
+
+    def remove_file(self, file_object: File):
+        if str(file_object.path) in self._index:
+            print(f"Removing {file_object.path}")
+            del self._index[str(file_object.path)]
 
     def save(self):
         with open(self.path / INDEX_FILE_NAME, 'w') as f:
@@ -166,11 +176,13 @@ class FileIndex:
         self.load()
         print("Loading source index")
         other.load()
+
+        print("Getting source files by size")
         other_sizes = other.by_size()
 
         missing: List[File] = []
-    
-        print("Comparing files")
+
+        print("Comparing files.")
         for _, my_file in self.index.items():
             found = False
             if not my_file.size in other_sizes:
@@ -252,6 +264,7 @@ def compare(destination: Path, source: Path, min_size: int = 1):
     for f in missing:
         print(f)
 
+
 @cli.command()
 @click.argument("folder", type=click.Path(path_type=Path, file_okay=False, exists=True))
 @click.argument("missing_files", type=click.Path(path_type=Path, dir_okay=False, exists=True))
@@ -277,7 +290,7 @@ def delete(folder: Path, missing_files: Path, delete: bool = False):
     folder_index = FileIndex(folder)
     print("Reading file info")
     folder_index.load()
-    
+
     print("Running through files.")
     for path, file_info in folder_index.index.items():
         if not str(file_info.path) in missing_files_path:
@@ -294,8 +307,54 @@ def delete(folder: Path, missing_files: Path, delete: bool = False):
                 print(f"File to delete: {path}")
         else:
             print(f"File missing from destination: {path}")
-    
 
+
+@cli.command()
+@click.argument("folder", type=click.Path(path_type=Path, file_okay=False, exists=True))
+@click.option("--min-size", type=int, help="Minimum file size to consider", default=1)
+def duplicates(folder: Path, min_size: int = 1):
+    """Find duplicate files within a folder."""
+
+    print("Loading fileindex")
+    folder_index = FileIndex(folder)
+    print("Reading file info")
+    folder_index.load()
+
+    files_by_size = folder_index.by_size()
+
+    for size, files in files_by_size.items():
+        if size < min_size:
+            print(f"Skipping {len(files)} file(s) of size {size}.")
+
+        hashes: Dict[str, List[File]] = {}
+        for file in files:
+            if not file.path.exists():
+                continue
+
+            if file.quickhash not in hashes:
+                hashes[file.quickhash] = []
+            hashes[file.quickhash].append(file)
+
+        for _, files in hashes.items():
+            if len(files) > 1:
+                long_hashes: Dict[str, List[File]] = {}
+                for file in files:
+                    long_hash = file.hash
+
+                    if long_hash not in long_hashes:
+                        long_hashes[long_hash] = []
+
+                    long_hashes[long_hash].append(file)
+
+                for _, long_files in long_hashes.items():
+                    if len(long_files) > 1:
+                        print("Duplicate files: ")
+                        for f in sorted(long_files, key=lambda x: x.path):
+                            print(f.path)
+
+                        print("")
+
+    folder_index.save()
 
 
 if __name__ == "__main__":

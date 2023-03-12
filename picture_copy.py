@@ -14,7 +14,7 @@ basicConfig()
 logger = getLogger("picture_copy")
 logger.setLevel(os.environ.get('LOGLEVEL', 'WARNING'))
 
-EXTENSIONS = ('nef', 'mov')
+EXTENSIONS = ('nef', 'mov', 'jpg', 'mp4')
 
 
 class PictureFile(TypedDict):
@@ -51,15 +51,11 @@ def find_files(folder: Path):
 def prune_files(files: List[PictureFile], dest_folder: Path):
     outfiles: List[FileToCopy] = []
     for file in files:
-        outfile: FileToCopy = {
-            'file': file,
-            'copy': True,
-            'dest_folder': None
-        }
+        outfile: FileToCopy = {'file': file, 'copy': True, 'dest_folder': None}
 
         ts = file['timestamp']
-        picture_dest_folder = (dest_folder /
-                               str(ts.year) / str(ts.month).zfill(2))
+        picture_dest_folder = (dest_folder / str(ts.year) /
+                               str(ts.month).zfill(2))
         outfile['dest_folder'] = picture_dest_folder
 
         extension = file['filename'].split('.')[-1].lower()
@@ -79,11 +75,11 @@ def copy_files(files: List[FileToCopy], dry_run: bool = True):
     for copyfile in files:
         source = copyfile['file']
         if copyfile['copy']:
-            print(f"Copying {source['filename']}")
+            print(f"Copying {source['filename']} to {copyfile['dest_folder']}")
             if copyfile['dest_folder'] and copyfile['dest_folder'].exists():
-                logger.warning("Destination folder exists")
+                logger.info("Destination folder exists: %s")
                 if not copyfile['dest_folder'].is_dir():
-                    logger.error("... but is not a folder")
+                    logger.error("%s is not a folder", copyfile['dest_folder'])
                     raise IOError
             else:
                 logger.info("Destination folder does not exist")
@@ -92,8 +88,8 @@ def copy_files(files: List[FileToCopy], dry_run: bool = True):
                     copyfile['dest_folder'].mkdir(parents=True)
 
             if not dry_run and copyfile['dest_folder']:
-                shutil.copy2((source['folder'] /
-                             source['filename']), copyfile['dest_folder'])
+                shutil.copy2((source['folder'] / source['filename']),
+                             copyfile['dest_folder'])
 
         else:
             logger.debug(f"Skipping {source['filename']}, destination exists.")
